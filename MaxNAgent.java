@@ -316,7 +316,7 @@ public class MaxNAgent extends Agent {
     public Position[] playBestMove(Board board) {
 
         int bestUtility = 0;
-        HashMap<Integer, Position[]> nextMoves = AgentUtilities.getNextMoves(board);
+        HashMap<Integer, Position[]> nextMoves = getNextMoves(board);
         Position[] pieces = board.getPositions(board.getTurn()).toArray(new Position[0]);
         Position start = pieces[0];
         Position end = pieces[0];
