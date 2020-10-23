@@ -13,7 +13,7 @@ public class MCTSAgent extends Agent {
 
     // FIELDS
     private String name = "MCTS";
-    private double rate = 0.1;
+    private double rate = 0.3;
     // public static long startTime = 0;
     // public static long endTime = 0;
     private boolean grudgeMode = false;
@@ -62,36 +62,37 @@ public class MCTSAgent extends Agent {
         Position[] firstMove = new Position[2];
         Position[] move = new Position[2];
 
+        //grudge variables setup
+        Colour myColour = board.getTurn();
+        int myOrdinal = myColour.ordinal();
+        Colour[] colours = Colour.values();
+        Colour victimColour = colours[(myOrdinal + 1) % colours.length];
+
         int bestMove = -1000;
-        double bestAverage = -1000;
+        double bestAverage = 0.0;
         boolean keepSearching = true;
 
         while (keepSearching) {
 
+
+            // // early game policy
+            // if (board.getMoveCount() < 20) rate = 0.1;
+
             // late game policy
-            if (board.getTimeLeft(board.getTurn()) < 1000)
-                rate = 0.1;
+            if (board.getTimeLeft(board.getTurn()) < 1000) rate = 0.1;
 
-            // search time policy
-            if ((timeLeft * rate) < (timeB - timeA))
-                keepSearching = false;
-
-            // clone board and store agents colour
+            // clone board
             Board boardClone = new Board(300);
             try {
                 boardClone = (Board) board.clone();
             } catch (CloneNotSupportedException e) {
                 System.out.println(e);
             }
-            Colour myColour = boardClone.getTurn();
-            int myOrdinal = myColour.ordinal();
-            Colour[] colours = Colour.values();
-            Colour victimColour = colours[(myOrdinal + 1) % colours.length];
 
-            // select and store first move
+            //select and store first move
             firstMove = playRandomMove(boardClone);
             try {
-                boardClone.move(firstMove[0], firstMove[1], 1);
+                boardClone.move(firstMove[0], firstMove[1]);
             } catch (ImpossiblePositionException e) {
                 System.out.println(e);
             }
@@ -100,7 +101,7 @@ public class MCTSAgent extends Agent {
             while (!boardClone.gameOver()) {
                 move = playRandomMove(boardClone);
                 try {
-                    boardClone.move(move[0], move[1], 1);
+                    boardClone.move(move[0], move[1]);
                 } catch (ImpossiblePositionException e) {
                     System.out.println(e);
                 }
@@ -108,15 +109,21 @@ public class MCTSAgent extends Agent {
 
             // store outcome of this game
             int[] outcome = { 0, 0, 0 };
+            // if grudgemode is on
             if (grudgeMode == true) {
                 if (boardClone.getLoser() == victimColour && 
                     boardClone.getWinner() == myColour) {
-                        outcome[boardClone.getWinner().ordinal()] = 1;
+                        outcome[myOrdinal] += 1;
                 }
-                outcome[boardClone.getLoser().ordinal()] = -1;
-            } else {
-                outcome[boardClone.getWinner().ordinal()] = 1;
-                outcome[boardClone.getLoser().ordinal()] = -1;
+                // else if I am the loser to anyone
+                // else if (boardClone.getLoser() == myColour) {
+                //     outcome[boardClone.getLoser().ordinal()] += -1;
+                // }
+            // else normalmode
+            } 
+            else {
+                outcome[boardClone.getWinner().ordinal()] += 1;
+                //outcome[boardClone.getLoser().ordinal()] += -1;
             }
 
             // convert move to Integer for use as HashMap key
@@ -126,9 +133,8 @@ public class MCTSAgent extends Agent {
             // if this move has been played before
             if (moveNodesHashMap.containsKey(thisMoveAsInt)) {
                 moveNode tempNode = new moveNode();
-                // tempNode.gamesPlayed = moveNodes.get(thisMoveAsInt).gamesPlayed;
                 tempNode.copy(moveNodesHashMap.get(thisMoveAsInt));
-                tempNode.gamesWon += outcome[myColour.ordinal()];
+                tempNode.gamesWon += outcome[myOrdinal];
                 tempNode.gamesPlayed += 1;
                 moveNodesHashMap.put(thisMoveAsInt, tempNode);
             }
@@ -137,7 +143,7 @@ public class MCTSAgent extends Agent {
                 moveNode tempNode = new moveNode();
                 tempNode.start = firstMove[0];
                 tempNode.end = firstMove[1];
-                tempNode.gamesWon += outcome[myColour.ordinal()];
+                tempNode.gamesWon += outcome[myOrdinal];
                 tempNode.gamesPlayed += 1;
                 moveNodesHashMap.put(thisMoveAsInt, tempNode);
             }
@@ -149,12 +155,19 @@ public class MCTSAgent extends Agent {
             // update if best move
             int played = moveNodesHashMap.get(thisMoveAsInt).gamesPlayed;
             int won = moveNodesHashMap.get(thisMoveAsInt).gamesWon;
-            if (bestAverage <= (won / played)) {
-                bestAverage = (won / played);
+            if (bestAverage < (double) ((double) won/(double) played)) {
+                bestAverage = (double) ((double) won/(double) played);
                 bestMove = thisMoveAsInt;
+                //System.out.println("BA:" + bestAverage);
             }
             timeB = System.currentTimeMillis();
+            // search time policy
+            if ((timeLeft * rate) < (timeB - timeA))
+            keepSearching = false;
         }
+        // System.out.println("bestAverage: " + bestAverage);
+        // System.out.println(moveNodesHashMap.get(bestMove).gamesWon + "/" +moveNodesHashMap.get(bestMove).gamesPlayed);
+
         return new Position[] { moveNodesHashMap.get(bestMove).start, moveNodesHashMap.get(bestMove).end };
     }
 
